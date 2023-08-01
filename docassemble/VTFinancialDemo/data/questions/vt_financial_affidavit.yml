@@ -13,7 +13,7 @@ objects:
 id: interview order
 mandatory: True
 code: |
-  house_expenses_table.totals.gathered
+  house_expenses_category.subtotals.gathered
   generic_expense_summary
   
   if employed:
@@ -139,44 +139,44 @@ fields:
 # Generic expense gathering
 ---
 objects:
-  house_expenses_table: DAObject
-  house_expenses_table.totals: ALExpenseList.using(complete_attribute="complete")
-  house_expenses_table.paid_by_other: ALExpenseList.using(auto_gather=False,gathered=True)
+  house_expenses_category: DAObject
+  house_expenses_category.subtotals: ALExpenseList.using(complete_attribute="complete")
+  house_expenses_category.paid_by_other: ALExpenseList.using(auto_gather=False,gathered=True)
 ---
 # This complexity avoids making a separate module which may be even harder to maintain
 generic object: DAObject
 code: |
-  x.totals.moved
-  for index, exp in enumerate(x.totals.elements):
+  x.subtotals.moved
+  for index, exp in enumerate(x.subtotals.elements):
     exp.value
-    x.paid_by_other[ index ].source = x.totals[ index ].source
-    x.paid_by_other[ index ].times_per_year = x.totals[ index ].times_per_year
-    if x.totals[ index ].portion_is_paid_by_other:
+    x.paid_by_other[ index ].source = x.subtotals[ index ].source
+    x.paid_by_other[ index ].times_per_year = x.subtotals[ index ].times_per_year
+    if x.subtotals[ index ].portion_is_paid_by_other:
       x.paid_by_other[ index ].value
     else:
       x.paid_by_other[ index ].value = '0'
   
   # Make sure every source has a value to show and edit later
   for source in x.choices:
-    if source not in x.totals.sources():
-      sub_total = x.totals.appendObject()
-      sub_total.source = source
-      sub_total.times_per_year = 12
-      sub_total.value = '0'
+    if source not in x.subtotals.sources():
+      subtotal = x.subtotals.appendObject()
+      subtotal.source = source
+      subtotal.times_per_year = 12
+      subtotal.value = '0'
       
-  x.totals.revisit = True
-  x.totals.gathered = True
+  x.subtotals.revisit = True
+  x.subtotals.gathered = True
 ---
 generic object: DAObject
 code: |
-  x.totals.selected_types
-  x.totals.move_checks_to_list(selected_terms=expense_terms)
-  x.totals.moved = True
+  x.subtotals.selected_types
+  x.subtotals.move_checks_to_list(selected_terms=expense_terms)
+  x.subtotals.moved = True
 ---
 code: |
-  house_expenses_table.name = "household"
+  house_expenses_category.name = "household"
   # We can make the two below translatable if we do it right
-  house_expenses_table.choices = [
+  house_expenses_category.choices = [
     ("rent", "The rent"),
     ("heat", "The heat"),
     ("phone", "The phone")
@@ -192,7 +192,7 @@ generic object: DAObject
 question: |
   What expenses do you have for your ${ x.name }?
 fields:
-  - no label: x.totals.selected_types
+  - no label: x.subtotals.selected_types
     datatype: checkboxes
     code: |
       x.choices
@@ -200,32 +200,32 @@ fields:
 id: expense information
 generic object: DAObject
 question: |
-  What is your expense for ${ x.totals[i].source }?
+  What is your expense for ${ x.subtotals[i].source }?
 fields:
-  - Amount: x.totals[i].value
+  - Amount: x.subtotals[i].value
     datatype: currency
     min: 0
     validation messages:
       min: The amount must be more than ${ currency(0) }
-  - How often do you pay this amount?: x.totals[i].times_per_year
+  - How often do you pay this amount?: x.subtotals[i].times_per_year
     default: 12
     code: |
       times_per_year_for_expenses
-  - Does anyone else help pay for this expense? This can include your employer: x.totals[i].portion_is_paid_by_other
+  - Does anyone else help pay for this expense? This can include your employer: x.subtotals[i].portion_is_paid_by_other
     datatype: yesnoradio
 ---
 id: expense paid by other
 generic object: DAObject
 # For translation, .source would actually be more complicated code
-question: How much do other people help pay for ${ x.totals[i].source } ${ times_per_year(times_per_year_list, x.totals[i].times_per_year) }?
+question: How much do other people help pay for ${ x.subtotals[i].source } ${ times_per_year(times_per_year_list, x.subtotals[i].times_per_year) }?
 fields:
   - Amount: x.paid_by_other[i].value
     datatype: currency
     min: 0
-    max: ${ x.totals[i].value }
+    max: ${ x.subtotals[i].value }
     validation messages:
       min: The amount must be more than ${ currency(0) }
-      max: The amount must be equal to or less than ${ currency( x.totals[i].value )}
+      max: The amount must be equal to or less than ${ currency( x.subtotals[i].value )}
 ---
 id: expense summary
 continue button field: generic_expense_summary
@@ -234,30 +234,30 @@ question: |
 subquestion: |
   # Household expenses per month
   
-  % if house_expenses_table.totals.there_are_any:
+  % if house_expenses_category.subtotals.there_are_any:
   Total of each household expense:
   
-  * Rent: ${ currency(house_expenses_table.totals.total(source=["rent"], times_per_year=12)) }
-  * Heat: ${ currency(house_expenses_table.totals.total(source=["heat"], times_per_year=12)) }
-  * Phone: ${ currency(house_expenses_table.totals.total(source=["phone"], times_per_year=12)) }
+  * Rent: ${ currency(house_expenses_category.subtotals.total(source=["rent"], times_per_year=12)) }
+  * Heat: ${ currency(house_expenses_category.subtotals.total(source=["heat"], times_per_year=12)) }
+  * Phone: ${ currency(house_expenses_category.subtotals.total(source=["phone"], times_per_year=12)) }
   
-  **Total:** ${ currency(house_expenses_table.totals.total(times_per_year=12)) }
+  **Total:** ${ currency(house_expenses_category.subtotals.total(times_per_year=12)) }
   
   Amount of each household expense that someone else pays:
   
-  * Rent: ${ house_expenses_table.paid_by_other.total(source=["rent"], times_per_year=12) }
-  * Heat: ${ house_expenses_table.paid_by_other.total(source=["heat"], times_per_year=12) }
-  * Phone: ${ house_expenses_table.paid_by_other.total(source=["phone"], times_per_year=12) }
+  * Rent: ${ house_expenses_category.paid_by_other.total(source=["rent"], times_per_year=12) }
+  * Heat: ${ house_expenses_category.paid_by_other.total(source=["heat"], times_per_year=12) }
+  * Phone: ${ house_expenses_category.paid_by_other.total(source=["phone"], times_per_year=12) }
   
-  **Total others pay:** ${ house_expenses_table.paid_by_other.total(times_per_year=12) }
+  **Total others pay:** ${ house_expenses_category.paid_by_other.total(times_per_year=12) }
   
   Amount of each household expense that you pay:
   
-  * Rent: ${ house_expenses_table.totals.total(source=["rent"], times_per_year=12) - house_expenses_table.paid_by_other.total(source=["rent"], times_per_year=12) }
-  * Heat: ${ house_expenses_table.totals.total(source=["heat"], times_per_year=12) - house_expenses_table.paid_by_other.total(source=["heat"], times_per_year=12) }
-  * Phone: ${ house_expenses_table.totals.total(source=["phone"], times_per_year=12) - house_expenses_table.paid_by_other.total(source=["phone"], times_per_year=12) }
+  * Rent: ${ house_expenses_category.subtotals.total(source=["rent"], times_per_year=12) - house_expenses_category.paid_by_other.total(source=["rent"], times_per_year=12) }
+  * Heat: ${ house_expenses_category.subtotals.total(source=["heat"], times_per_year=12) - house_expenses_category.paid_by_other.total(source=["heat"], times_per_year=12) }
+  * Phone: ${ house_expenses_category.subtotals.total(source=["phone"], times_per_year=12) - house_expenses_category.paid_by_other.total(source=["phone"], times_per_year=12) }
   
-  **Total you pay:** ${ house_expenses_table.totals.total(times_per_year=12) - house_expenses_table.paid_by_other.total(times_per_year=12) }
+  **Total you pay:** ${ house_expenses_category.subtotals.total(times_per_year=12) - house_expenses_category.paid_by_other.total(times_per_year=12) }
   
   % else:
   You have no household expenses.
